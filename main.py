@@ -1,66 +1,52 @@
 from pathlib import Path
 from exif import Image
-import argparse
+import questionary
+import logging
 import os
 
+class PictureSort:
 
-def get_creation_time(path: str):
-    with open(path, "rb") as file:
-        img = Image(file)
-        if img.has_exif:
-            ctime = img.datetime_original
-            if isinstance(ctime, str):
-                return ctime.replace(":", "-").replace(" ", "-")
+    @staticmethod
+    def get_creation_time(path: str):
+        with open(path, "rb") as file:
+            img = Image(file)
+            if img.has_exif:
+                ctime = img.datetime_original
+                if isinstance(ctime, str):
+                    return ctime.replace(":", "-").replace(" ", "-")
 
+    @classmethod
+    def key_time_map(cls, path: str):
+        ls = Path(path).iterdir()
+        ls = filter(lambda i: hasattr(i, 'name'), ls)
+        ls = filter(lambda i: str(str(i.name).split('.')[-1]).lower() == 'jpg', ls)
+        ls = map(lambda i: (str(i.name).split('.')[0], cls. get_creation_time(i)), ls)
+        ls = filter(lambda i: bool(i[-1]), ls)
+        return dict(ls)
 
-def already_named(key: str):
-    key_date = key.split("_")[0].replace("-", "")
-    return key_date.isdigit() and len(key_date) == 24
+    @classmethod
+    def move_files_map(cls, path: str):
+        key_time_map = cls.key_time_map(path)
+        ls = Path(path).iterdir()
+        ls = filter(lambda i: hasattr(i, 'name'), ls)
+        ls = filter(lambda i: hasattr(i, 'parent'), ls)
+        ls = map(lambda i: (i, str(i.name).split('.')), ls)
+        ls = map(lambda i: list(i) + [key_time_map.get(i[1][0])], ls)
+        ls = map(lambda i: (i[0], [i[2]] + [i[1][0]] + ['.'] + [i[1][-1]]), ls)
+        ls = map(lambda i: (i[0], ''.join(map(str,i[1]))), ls)
+        ls = map(lambda i: (str(i[0]),  os.path.join(i[0].parent, i[1])), ls)
+        return dict(ls)
 
-
-def get_key_extension(file: Path):
-    file = Path(file)
-    if file.is_file():
-        return file.name.split(".")
-    return None, None
-
-
-def file_name(file: Path):
-    key, extension = get_key_extension(file)
-    if key and extension:
-        if not already_named(key):
-            if extension.lower() == "jpg":
-                ctime = get_creation_time(str(file))
-                return (key, ctime)
-
-
-def set_file_name(file: Path, file_dict: dict):
-    key, extension = get_key_extension(file)
-    if key and extension:
-        if ctime := file_dict.get(key):
-            new_filename = ctime + "_" + key + "." + extension
-            return (str(file), os.path.join(file.parent, new_filename))
-
-
-def main(path: str):
-    file_dict = dict(filter(bool, map(file_name, Path(path).iterdir())))
-    move_dict = dict(
-        filter(bool, map(lambda i: set_file_name(i, file_dict), Path(path).iterdir()))
-    )
-    for k, v in move_dict.items():
-        Path(k).rename(v)
-
+    @classmethod
+    def run(cls, path: str):
+        move_files_map = cls.move_files_map(path)
+        for k, v in move_files_map.items():
+            try:
+                Path(k).rename(v)    
+            except Exception as e: 
+                logging.info(str(e))
+                pass
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Rename JPG files in a directory based on EXIF date.",
-    )
-    parser.add_argument(
-        "-p",
-        "--path",
-        type=str,
-        required=True,
-        help="Path to the directory containing files to rename",
-    )
-    args = parser.parse_args()
-    main(args.path)
+    path = questionary.path("Path Picture folder").ask()
+    PictureSort.run(str(path))
