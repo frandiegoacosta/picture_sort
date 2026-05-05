@@ -4,10 +4,17 @@ import questionary
 import logging
 import os
 
+_JPEG_SUFFIXES = frozenset({".jpg", ".jpeg", ".jpe"})
+
+
+def _is_jpeg(path: Path) -> bool:
+    return path.is_file() and path.suffix.lower() in _JPEG_SUFFIXES
+
+
 class PictureSort:
 
     @staticmethod
-    def get_creation_time(path: str):
+    def get_creation_time(path: Path):
         with open(path, "rb") as file:
             img = Image(file)
             if img.has_exif:
@@ -18,9 +25,8 @@ class PictureSort:
     @classmethod
     def key_time_map(cls, path: str):
         ls = Path(path).iterdir()
-        ls = filter(lambda i: hasattr(i, 'name'), ls)
-        ls = filter(lambda i: str(str(i.name).split('.')[-1]).lower() == 'jpg', ls)
-        ls = map(lambda i: (str(i.name).split('.')[0], cls. get_creation_time(i)), ls)
+        ls = filter(_is_jpeg, ls)
+        ls = map(lambda i: (i.stem, cls.get_creation_time(i)), ls)
         ls = filter(lambda i: bool(i[-1]), ls)
         return dict(ls)
 
@@ -28,17 +34,30 @@ class PictureSort:
     def move_files_map(cls, path: str):
         key_time_map = cls.key_time_map(path)
         ls = Path(path).iterdir()
-        ls = filter(lambda i: hasattr(i, 'name'), ls)
-        ls = filter(lambda i: hasattr(i, 'parent'), ls)
-        ls = map(lambda i: (i, str(i.name).split('.')), ls)
-        ls = map(lambda i: list(i) + [key_time_map.get(i[1][0])], ls)
-        ls = map(lambda i: (i[0], [i[2]] + [i[1][0]] + ['.'] + [i[1][-1]]), ls)
-        ls = map(lambda i: (i[0], ''.join(map(str,i[1]))), ls)
-        ls = map(lambda i: (str(i[0]),  os.path.join(i[0].parent, i[1])), ls)
+        ls = filter(_is_jpeg, ls)
+        ls = map(
+            lambda p: (
+                p,
+                key_time_map.get(p.stem),
+            ),
+            ls,
+        )
+        ls = filter(lambda item: item[1] is not None, ls)
+        ls = map(
+            lambda item: (
+                str(item[0]),
+                os.path.join(
+                    item[0].parent,
+                    f"{item[1]}{item[0].stem}{item[0].suffix.lower()}",
+                ),
+            ),
+            ls,
+        )
         return dict(ls)
 
     @classmethod
     def run(cls, path: str):
+        path = str(Path(path).expanduser().resolve())
         move_files_map = cls.move_files_map(path)
         for k, v in move_files_map.items():
             try:
