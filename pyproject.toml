@@ -1,12 +1,16 @@
 [project]
-name = "pictures"
-version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
+name = "picture-sort"
+version = "0.2.0"
+description = "Rename JPEG files based on EXIF capture time."
+readme = "readme.md"
 requires-python = ">=3.12"
 dependencies = [
     "exif>=1.6.1",
+    "questionary>=2.1.1",
+]
+
+[project.optional-dependencies]
+dev = [
     "jupyter>=1.1.1",
     "pillow>=12.1.0",
-    "questionary>=2.1.1",
 ]

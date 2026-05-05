@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# picture-sort wrapper: launches the fully interactive picture_sort CLI.
+# Resolves the repo root from this script's location so it can be called
+# from any working directory. Takes no arguments — everything is asked
+# interactively.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo "picture-sort: 'uv' not found in PATH" >&2
+  exit 127
+fi
+
+exec uv run --no-sync --project "$SCRIPT_DIR" python "$SCRIPT_DIR/main.py"
